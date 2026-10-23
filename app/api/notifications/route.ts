@@ -1,0 +1,3 @@
+import {authorize,db,json,sameOrigin} from '@/lib/server';
+export async function GET(request:Request){try{const {token}=await authorize(request);return json(await db('/rest/v1/notifications?select=*&order=created_at.desc&limit=100',token));}catch(e){return json({error:(e as Error).message},401);}}
+export async function PATCH(request:Request){try{sameOrigin(request);const {token}=await authorize(request);await db('/rest/v1/notifications?read_at=is.null',token,{method:'PATCH',body:JSON.stringify({read_at:new Date().toISOString()})});return json({ok:true});}catch(e){return json({error:(e as Error).message},400);}}

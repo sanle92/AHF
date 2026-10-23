@@ -1,0 +1,2 @@
+import {authorize,db,json} from '@/lib/server';
+export async function GET(r:Request){try{const {token}=await authorize(r);const all=[];for(let offset=0;offset<10000;offset+=1000){const page=await db('/rest/v1/ledger_entries?select=*&order=posting_date.asc,id.asc&limit=1000&offset='+offset,token);all.push(...page);if(page.length<1000)return json(all);}return json({error:'Ledger exceeds the interactive report limit. Export it from your secured backend.'},413);}catch(e){return json({error:(e as Error).message},401);}}

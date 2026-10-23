@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {canRead,canWrite,nextStatuses,validateRecord,type RecordItem,type Profile} from '../lib/domain.ts';
+const admin:Profile={id:'00000000-0000-4000-8000-000000000001',name:'Admin',roles:['administrator'],active:true};
+const chair:Profile={...admin,id:'00000000-0000-4000-8000-000000000002',roles:['chairperson']};
+const secretary:Profile={...admin,roles:['secretary','treasurer']};
+const expense:RecordItem={id:'10000000-0000-4000-8000-000000000001',kind:'expense',status:'Pending',created_by:admin.id,title:'Sample expense',amount:50000,date:'2026-10-22',category:'General',description:'',assignee:null,created_at:'2026-10-22',updated_at:'2026-10-22',version:1,details:{}};
+test('leadership and treasury cannot access beneficiary records by default',()=>{assert.equal(canRead(chair,'beneficiary'),false);assert.equal(canRead(secretary,'beneficiary'),false);assert.equal(canRead(admin,'beneficiary'),true);});
+test('minutes authoring stays with secretary and administrator; review uses a separate inbox',()=>{assert.equal(canWrite(secretary,'minutes'),true);assert.equal(canRead(chair,'minutes'),false);assert.deepEqual(nextStatuses({...expense,status:'Submitted'},chair),[]);});
+test('an approved expense cannot be marked paid; an actual payment record is required',()=>{assert.deepEqual(nextStatuses({...expense,status:'Approved'},chair),[]);assert.deepEqual(nextStatuses({...expense,status:'Approved'},secretary),[]);assert.deepEqual(nextStatuses({...expense,kind:'payment',status:'Draft'},secretary),['Paid']);});
+test('inactive accounts cannot read or create records',()=>{assert.equal(canRead({...admin,active:false},'program'),false);assert.equal(canWrite({...admin,active:false},'expense'),false);});
+test('invalid money and invalid record kinds are rejected',()=>{const base={kind:'expense',title:'Materials request',date:'2026-10-22',description:'',category:'General',assignee:null};assert.throws(()=>validateRecord({...base,amount:-1}));assert.throws(()=>validateRecord({...base,amount:12.4}));assert.throws(()=>validateRecord({...base,kind:'profile',amount:10}));assert.equal(validateRecord({...base,amount:'12000'}).amount,12000);});

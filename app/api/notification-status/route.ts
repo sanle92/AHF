@@ -1,0 +1,2 @@
+import {authorize,config,db,json} from '@/lib/server';
+export async function GET(r:Request){try{const {token}=await authorize(r),c=config();const [health,deliveries]=await Promise.all([db('/rest/v1/dispatch_health?select=*',token),db('/rest/v1/notification_deliveries?select=outcome,error_code,created_at&order=created_at.desc&limit=20',token)]);return json({configured:!!(c.vapidPublic&&c.vapidPrivate&&c.vapidSubject&&c.serviceKey&&c.dispatchSecret),health:health[0]||null,deliveries});}catch(e){return json({error:(e as Error).message},400);}}

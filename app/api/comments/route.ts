@@ -1,0 +1,4 @@
+import {authorize,db,json,sameOrigin} from '@/lib/server';
+import {validUuid} from '@/lib/domain';
+export async function GET(r:Request){try{const {token}=await authorize(r),id=new URL(r.url).searchParams.get('record_id');if(!validUuid(id))throw Error('Invalid record.');return json(await db('/rest/v1/record_comments?record_id=eq.'+id+'&select=*&order=created_at.asc&limit=500',token));}catch(e){return json({error:(e as Error).message},400);}}
+export async function POST(r:Request){try{sameOrigin(r);const {token,profile}=await authorize(r),v=await r.json<any>();if(!validUuid(v.record_id)||typeof v.body!=='string'||v.body.trim().length<1||v.body.length>5000)throw Error('Write a comment up to 5,000 characters.');return json(await db('/rest/v1/record_comments',token,{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({record_id:v.record_id,body:v.body.trim(),author_id:profile.id})}),201);}catch(e){return json({error:(e as Error).message},400);}}

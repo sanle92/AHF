@@ -1,0 +1,19 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {money,type RecordItem} from '@/lib/domain';
+import {csv,download} from '@/lib/exports';
+import type {Api} from './record-detail';
+type Entry={id:string;record_id:string;account_id:string;fund_id:string|null;amount:number;currency:string;posting_date:string;reversal_of:string|null};
+export default function FinanceSummary({records,api,demo,onError}:{records:RecordItem[];api:Api;demo:boolean;onError:(s:string)=>void}){
+ const [entries,setEntries]=useState<Entry[]>([]),[show,setShow]=useState(false),[currency,setCurrency]=useState('UGX'),[from,setFrom]=useState(''),[to,setTo]=useState('');
+ useEffect(()=>{if(!demo)api('ledger').then(setEntries).catch(e=>onError(e.message));},[api,demo,records]); // eslint-disable-line react-hooks/exhaustive-deps
+ const amounts=(kind:string,status:string[])=>records.filter(r=>r.kind===kind&&status.includes(r.status)&&(r.currency||'UGX')===currency).reduce((a,r)=>a+Number(r.amount),0);
+ const filtered=entries.filter(e=>e.currency===currency&&(!from||e.posting_date>=from)&&(!to||e.posting_date<=to));
+ const paid=Math.abs(filtered.filter(e=>e.amount<0&&!e.reversal_of).reduce((a,e)=>a+Number(e.amount),0));
+ return <section className="card finance-summary"><div className="card-heading"><div><h2>Finance control centre</h2><p>Requests, approvals, and ledger postings are tracked separately.</p></div><select aria-label="Financial summary currency" value={currency} onChange={e=>setCurrency(e.target.value)}>{['UGX','USD','EUR','GBP','KES'].map(c=><option key={c}>{c}</option>)}</select></div><div className="finance-metrics"><div><small>Submitted requests</small><strong>{money(amounts('expense',['Submitted']),currency)}</strong></div><div><small>Approved commitments</small><strong>{money(amounts('expense',['Approved','Partly paid','Paid']),currency)}</strong></div><div><small>Open advances</small><strong>{money(amounts('advance',['Paid']),currency)}</strong></div><div><small>Recorded payments / outflows</small><strong>{money(paid,currency)}</strong></div></div>
+  <div className="account-balances">{records.filter(r=>r.kind==='account'&&r.currency===currency).map(r=><div key={r.id}><span>{r.title} · {r.status}</span><strong>{money(entries.filter(e=>e.account_id===r.id).reduce((a,e)=>a+Number(e.amount),0),currency)}</strong></div>)}</div>
+  <div className="button-row"><button className="button secondary" onClick={()=>setShow(!show)}>{show?'Hide':'View'} ledger</button><button className="button secondary" onClick={()=>download('AHF-ledger-'+currency+'.csv',csv([['Posting date','Record','Account','Fund','Currency','Amount','Reversal of'],...filtered.map(e=>[e.posting_date,records.find(r=>r.id===e.record_id)?.title||e.record_id,records.find(r=>r.id===e.account_id)?.title||e.account_id,records.find(r=>r.id===e.fund_id)?.title||e.fund_id,e.currency,e.amount,e.reversal_of])]),'text/csv;charset=utf-8')}>Export ledger</button></div>
+  {show&&<><div className="report-filters"><label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>To<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></div><div className="table-scroll"><table><thead><tr><th>Date</th><th>Account</th><th>Reference</th><th>Posting</th></tr></thead><tbody>{filtered.map(e=><tr key={e.id}><td>{e.posting_date}</td><td>{records.find(r=>r.id===e.account_id)?.title||e.account_id}</td><td>{records.find(r=>r.id===e.record_id)?.title||e.record_id}{e.reversal_of?' (reversal)':''}</td><td>{money(Number(e.amount),e.currency)}</td></tr>)}</tbody></table></div></>}
+  <p className="fine">Balances reflect posted records and documented opening balances. Reconcile with bank, mobile money, and cash statements. Historical records are not automatically posted. Transfers appear as matched outflows and inflows.</p>
+ </section>;
+}
